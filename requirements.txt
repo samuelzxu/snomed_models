@@ -2,3 +2,4 @@ evaluate
 ipymarkup
 jupyterlab
 seqeval
+ipywidgets
