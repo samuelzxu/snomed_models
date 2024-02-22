@@ -3,3 +3,5 @@ ipymarkup
 jupyterlab
 seqeval
 ipywidgets
+fire
+wandb
