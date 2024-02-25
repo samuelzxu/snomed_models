@@ -15,8 +15,10 @@ from sentence_transformers import InputExample, SentenceTransformer, losses, mod
 from sklearn.model_selection import train_test_split, KFold
 from torch.utils.data import DataLoader
 from tqdm.notebook import tqdm
-
 import wandb
+import bitsandbytes as bnb
+from torch import nn
+from transformers.trainer_pt_utils import get_parameter_names
 from transformers import (
     AutoTokenizer,
     DataCollatorForTokenClassification,
@@ -270,28 +272,54 @@ def main(
                 "accuracy": results["overall_accuracy"],
             }
 
-        run_name = f"{'-'.join(cer_model_id.split('/'))}{run_suffix}_fold{i}"
-        best_model_dir = f"best_{run_name}"
+        run_name = '-'.join(cer_model_id.split('/'))+run_suffix
 
-        wandb.init(name=run_name)
+        wandb.init(name=run_name+f"_fold{i}")
 
         training_args = TrainingArguments(
-            output_dir=f"checkpoints/{run_name}",
+            output_dir=f"~/checkpoints/{run_name}_fold{i}",
             learning_rate=2e-5,
             auto_find_batch_size=True,
             lr_scheduler_type='cosine',
+            optim='adafactor',
             num_train_epochs=15,
             warmup_ratio=0.1,
             weight_decay=0.01,
             evaluation_strategy="epoch",
             save_strategy="epoch",
             logging_steps=10,
-            run_name=run_name,
+            run_name=run_name+f"_fold{i}",
             load_best_model_at_end=True,
             metric_for_best_model='f1',
             fp16=fp16,
             seed=random_seed,
             report_to='wandb'
+        )
+
+        decay_parameters = get_parameter_names(cer_model, [nn.LayerNorm])
+        decay_parameters = [name for name in decay_parameters if "bias" not in name]
+        optimizer_grouped_parameters = [
+            {
+                "params": [p for n, p in cer_model.named_parameters() if n in decay_parameters],
+                "weight_decay": training_args.weight_decay,
+            },
+            {
+                "params": [p for n, p in cer_model.named_parameters() if n not in decay_parameters],
+                "weight_decay": 0.0,
+            },
+        ]
+
+        optimizer_kwargs = {
+            "betas": (training_args.adam_beta1, training_args.adam_beta2),
+            "eps": training_args.adam_epsilon,
+        }
+        optimizer_kwargs["lr"] = training_args.learning_rate
+        
+        adam_bnb_optim = bnb.optim.Adam8bit(
+            optimizer_grouped_parameters,
+            betas=(training_args.adam_beta1, training_args.adam_beta2),
+            eps=training_args.adam_epsilon,
+            lr=training_args.learning_rate,
         )
 
         trainer = Trainer(
@@ -302,14 +330,14 @@ def main(
             tokenizer=cer_tokenizer,
             data_collator=data_collator,
             compute_metrics=compute_metrics,
+            optimizers=(adam_bnb_optim, None)
         )
-
         trainer.train()
 
-        trainer.save_model(f"cer_models/{best_model_dir}")
-        cer_tokenizer.save_pretrained(f"cer_models/{best_model_dir}")
-
+        trainer.save_model(f"best_{run_name}_fold{i}")
+        cer_tokenizer.save_pretrained(f"best_{run_name}_fold{i}")
         wandb.finish()
+
 
 if __name__ == "__main__":
     fire.Fire(main)

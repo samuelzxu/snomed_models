@@ -3,6 +3,7 @@ kb_model/
 cer_model/
 data/
 linker.pickle
+full_concept_graph.gml
 
 best_*
 wandb/
