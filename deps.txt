@@ -1,2 +1,2 @@
-./full_concept_graph.gml
+./data/full_concept_graph.gml
 ./data

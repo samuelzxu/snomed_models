@@ -130,7 +130,7 @@ def main(encoder_model_id, random_seed=42, scope="min"):
     print(f"There are {test_notes_df.shape[0]} notes in the test set.")
 
     kb_model = SentenceTransformer(encoder_model_id)
-    SG = SnomedGraph.from_serialized("./full_concept_graph.gml")
+    SG = SnomedGraph.from_serialized("./data/data/data/full_concept_graph.gml")
 
     # If we want to simply use concepts for which we have a training example, it's this:
     concepts_in_scope = [

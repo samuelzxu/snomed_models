@@ -6,17 +6,16 @@ import pandas as pd
 from loguru import logger
 from more_itertools import chunked
 from peft import PeftConfig, PeftModel
-from transformers import AutoTokenizer, DebertaV2ForTokenClassification, pipeline
+from transformers import AutoTokenizer, AutoModelForTokenClassification, pipeline
 
 NOTES_PATH = Path("data/test_notes.csv")
 SUBMISSION_PATH = Path("submission.csv")
 LINKER_PATH = Path("linker.pickle")
-CER_MODEL_PATH = Path("cer_model")
+CER_MODEL_PATH = Path("best_yikuan8-Clinical-Longformer-noLoRA_fold4")
 
 CONTEXT_WINDOW_WIDTH = 12
-MAX_SEQ_LEN = 512
+MAX_SEQ_LEN = 4096
 USE_LORA = False
-
 
 def load_cer_pipeline():
     label2id = {"O": 0, "B-clinical_entity": 1, "I-clinical_entity": 2}
@@ -30,7 +29,7 @@ def load_cer_pipeline():
     if USE_LORA:
         config = PeftConfig.from_pretrained(CER_MODEL_PATH)
 
-        cer_model = DebertaV2ForTokenClassification.from_pretrained(
+        cer_model = AutoModelForTokenClassification.from_pretrained(
             pretrained_model_name_or_path=config.base_model_name_or_path,
             num_labels=3,
             id2label=id2label,
@@ -38,7 +37,7 @@ def load_cer_pipeline():
         )
         cer_model = PeftModel.from_pretrained(cer_model, CER_MODEL_PATH)
     else:
-        cer_model = DebertaV2ForTokenClassification.from_pretrained(
+        cer_model = AutoModelForTokenClassification.from_pretrained(
             pretrained_model_name_or_path=CER_MODEL_PATH,
             num_labels=3,
             id2label=id2label,
@@ -58,7 +57,7 @@ def load_cer_pipeline():
 def main():
     # columns are note_id, text
     logger.info("Reading in notes data.")
-    notes = pd.read_csv(NOTES_PATH).set_index("note_id")
+    notes = pd.read_csv(NOTES_PATH)
     logger.info(f"Found {notes.shape[0]} notes.")
     spans = []
 

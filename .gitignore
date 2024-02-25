@@ -1,9 +1,10 @@
 kb_model/
+*.tar.gz
 *.zip
 cer_model/
 data/
 linker.pickle
-full_concept_graph.gml
+data/full_concept_graph.gml
 
 best_*
 wandb/
