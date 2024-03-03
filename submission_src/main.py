@@ -48,11 +48,13 @@ def load_cer_pipeline():
         task="token-classification",
         model=cer_model,
         tokenizer=cer_tokenizer,
-        aggregation_strategy="first",
+        aggregation_strategy="simple",
         device="cpu",
     )
     return cer_pipeline
 
+def is_pos_in_span(pos, span):
+    return span["start"] <= pos < span["end"]
 
 def main():
     # columns are note_id, text
@@ -102,13 +104,28 @@ def main():
             chunk_end_idx = offset_chunk[-1][1]
             chunk_text = row.text[chunk_start_idx:chunk_end_idx]
 
+            predicted_annotations = cer_pipeline(chunk_text)
+
+            # combine spans that are sequential (with no space between them)
+            for i in range(len(chunk_text)):
+                for j in range(len(predicted_annotations)-1):
+                    if is_pos_in_span(i, predicted_annotations[j]) and is_pos_in_span(i+1, predicted_annotations[j+1]):
+                        predicted_annotations[j]["end"] = predicted_annotations[j+1]["end"]
+                        predicted_annotations.pop(j+1)
+                        break
+            
+            # remove invert spans
+            for ann in predicted_annotations:
+                if ann["start"] >= ann["end"]:
+                    predicted_annotations.remove(ann)
+
             # ...one matched clinical entity at a time
             # Iterate through the detected entities and link them
-            for entity in cer_pipeline(chunk_text):
+            for entity in predicted_annotations:
                 example = pd.Series(
                     {
                         # +1 to account for the [CLS] token
-                        "start": entity["start"] + chunk_start_idx + 1,
+                        "start": entity["start"] + chunk_start_idx, # took +1 out for longformer
                         "end": entity["end"] + chunk_start_idx,
                         "text": row.text,
                     }
@@ -117,7 +134,7 @@ def main():
                 if sctid:
                     spans.append(
                         {
-                            "note_id": row.Index,
+                            "note_id": row.note_id,
                             "start": example["start"],
                             "end": example["end"],
                             "concept_id": sctid,

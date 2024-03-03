@@ -11,7 +11,6 @@ class SnomedConceptDetails():
     """
     A class to represent the essential details of a SNOMED CT concept
     """
-
     def __init__(self, sctid: int, fsn: str, synonyms: List[str] = None) -> None:
         self.sctid = sctid
         self.fsn = fsn
@@ -28,8 +27,7 @@ class SnomedConceptDetails():
 
     @property
     def hierarchy(self) -> str:
-        hierarchy_match = re.search(r'\(([^)]+)\)\s*$', self.fsn)
-        
+        hierarchy_match = re.search(r'\(([^)]+)\)\s*$', self.fsn)  
 
 class SnomedRelationship():
     """
